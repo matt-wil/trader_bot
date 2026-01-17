@@ -31,44 +31,50 @@ def run_assistant():
         ("NVDA", "stock")      # High-volatility Stock
     ]
 
-    while True:
-        print(f"\n--- Starting Analysis Cycle: {time.strftime('%H:%M:%S')} ---")
 
+    while True:
         for symbol, asset_type in watch_list:
             try:
-                # STEP A: Get Current Market Price
-                price = ingestor.get_latest_price(symbol, asset_type)
-                if not price:
-                    print(f"⚠️ Skipping {symbol}: No price data available.")
-                    continue
+                # 1. Fetch historical data & Technical Signals
+                # Use the new get_history method we added to DataIngestor
+                history_df = ingestor.get_history(symbol, asset_type, days=100)
+                latest_metrics = ingestor.get_signals(history_df)
 
-                # STEP B: Get Filtered News & AI Sentiment
-                # The 'engine' now handles Boolean filtering and AI Pruning
-                print(f"🔍 Analyzing {symbol}...")
+                current_price = latest_metrics['close']
+                sma_50 = latest_metrics['SMA_50']
+                rsi = latest_metrics['RSI']
+
+                # 2. Get AI News Sentiment
                 headlines = engine.get_headlines(symbol)
                 sentiment_score = engine.analyze_sentiment(headlines, symbol)
 
-                # STEP C: Signal Logic & Notification
-                # If sentiment_score is None, it means the news was filtered as IRRELEVANT
-                if sentiment_score is not None:
-                    print(f"✅ {symbol} Score: {sentiment_score}")
+                # 3. CONVICTION LOGIC (The Money Maker)
+                # We only notify if News AND Math agree
+                is_bullish_math = current_price > sma_50 and rsi < 70
+                is_bullish_news = sentiment_score is not None and sentiment_score > 0.4
 
-                    # Only notify if the signal is strong enough to warrant a 'Tip'
-                    if abs(sentiment_score) >= 0.4:
-                        notifier.send_alert(symbol, price, sentiment_score)
-                        print(f"📱 Notification sent for {symbol}!")
-                    else:
-                        print(f"⚖️ Signal for {symbol} ({sentiment_score}) is too weak for alert.")
-                else:
-                    print(f"🔇 No relevant news found for {symbol}.")
+                if is_bullish_math and is_bullish_news:
+                    # High conviction tip!
+                    notifier.send_alert(
+                        symbol,
+                        current_price,
+                        sentiment_score,
+                        f"🔥 STRONG BUY: Trend is UP and News is BULLISH.\n(RSI: {rsi:.2f})"
+                    )
+
+                # (Optional) Add Bearish logic here as well
+                elif current_price < sma_50 and sentiment_score is not None and sentiment_score < -0.4:
+                    notifier.send_alert(
+                        symbol,
+                        current_price,
+                        sentiment_score,
+                        "⚠️ STRONG SELL: Trend is DOWN and News is BEARISH."
+                    )
 
             except Exception as e:
-                print(f"❌ Error processing {symbol}: {e}")
+                print(f"Error analyzing {symbol}: {e}")
 
-        # 3. Frequency Management
-        # 15-minute wait ensures you stay within free-tier API limits
-        print("\nCycle complete. Sleeping for 15 minutes...")
-        time.sleep(900)
+        time.sleep(900) # Sleep for 15 mins to stay in free tier
 
 if __name__ == "__main__":
     run_assistant()
