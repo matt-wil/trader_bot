@@ -1,0 +1,38 @@
+# --- Python Basics ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.python-version
+
+# --- Virtual Environments ---
+# Ignores your backend/venv folder
+venv/
+env/
+ENV/
+bin/
+lib/
+include/
+
+# --- Environment Variables ---
+# Ignores .env in the root AND backend/
+.env
+backend/.env
+.env.*
+
+# --- Distribution / Packaging ---
+dist/
+build/
+*.egg-info/
+
+# --- Logs ---
+# Ignores the logs folder inside backend
+backend/logs/*.log
+*.log
+
+# --- OS Specific ---
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
