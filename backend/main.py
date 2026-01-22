@@ -1,81 +1,90 @@
 # backend/main.py
 import os
 import time
-from pathlib import Path
 from dotenv import load_dotenv
-
-# Import your core modules
 from core.data_ingestor import DataIngestor
 from core.news_engine import NewsEngine
 from core.notifier import Notifier
+from core.logger import TradingLogger
 
-# 1. Setup Environment
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+load_dotenv()
 
-def run_assistant():
-    print("🤖 AI Trading Assistant Starting...")
+def run_money_maker():
+    print("💰 AI Trading Assistant: Money Maker Mode Active")
 
-    # 2. Initialize Core Services
-    ingestor = DataIngestor(
-        os.getenv("ALPACA_API_KEY"),
-        os.getenv("ALPACA_API_SECRET")
-    )
+    # Initialize Services
+    ingestor = DataIngestor(os.getenv("ALPACA_API_KEY"), os.getenv("ALPACA_API_SECRET"))
     engine = NewsEngine()
     notifier = Notifier()
 
-    # Define your watch list: (Symbol, Type for Alpaca)
+    # Your Focus Assets
     watch_list = [
-        ("GLD", "stock"),      # Gold ETF
-        ("BTC/USD", "crypto"), # Bitcoin
-        ("ETH/USD", "crypto"), # Ethereum
-        ("NVDA", "stock")      # High-volatility Stock
+        ("GLD", "stock"),
+        ("NVDA", "stock"),
+        ("BTC/USD", "crypto"),
+        ("ETH/USD", "crypto")
     ]
 
-
     while True:
-        for symbol, asset_type in watch_list:
+        print(f"\n--- 🔎 Scanning Markets: {time.strftime('%H:%M:%S')} ---")
+
+        for symbol, atype in watch_list:
             try:
-                # 1. Fetch historical data & Technical Signals
-                # Use the new get_history method we added to DataIngestor
-                history_df = ingestor.get_history(symbol, asset_type, days=100)
-                latest_metrics = ingestor.get_signals(history_df)
+                # 1. QUANT: Fetch Math Signals (SMA 50 and RSI)
+                df = ingestor.get_bars(symbol, atype)
+                latest_tech = ingestor.get_signals(df)
 
-                current_price = latest_metrics['close']
-                sma_50 = latest_metrics['SMA_50']
-                rsi = latest_metrics['RSI']
+                price = latest_tech['close']
+                sma_50 = latest_tech['SMA_50']
+                rsi = latest_tech['RSI']
 
-                # 2. Get AI News Sentiment
+                # 2. QUAL: Fetch AI Sentiment
                 headlines = engine.get_headlines(symbol)
                 sentiment_score = engine.analyze_sentiment(headlines, symbol)
 
-                # 3. CONVICTION LOGIC (The Money Maker)
-                # We only notify if News AND Math agree
-                is_bullish_math = current_price > sma_50 and rsi < 70
-                is_bullish_news = sentiment_score is not None and sentiment_score > 0.4
+                # LOGGING: Capture all data points for review
+                # Extract reasoning from the raw AI output we saw in the test
+                            reasoning = "N/A"
+                            if hasattr(engine, 'last_reasoning'): # Assuming you store it in the engine
+                                reasoning = engine.last_reasoning
 
-                if is_bullish_math and is_bullish_news:
-                    # High conviction tip!
-                    notifier.send_alert(
-                        symbol,
-                        current_price,
-                        sentiment_score,
-                        f"🔥 STRONG BUY: Trend is UP and News is BULLISH.\n(RSI: {rsi:.2f})"
-                    )
+                            # Determine the status for the log
+                            action_status = "HOLD"
+                            if sentiment_score and sentiment_score > 0.4 and price > sma_50:
+                                action_status = "BUY_ALERT"
+                            elif sentiment_score and sentiment_score < -0.4 and price < sma_50:
+                                action_status = "SELL_ALERT"
 
-                # (Optional) Add Bearish logic here as well
-                elif current_price < sma_50 and sentiment_score is not None and sentiment_score < -0.4:
-                    notifier.send_alert(
-                        symbol,
-                        current_price,
-                        sentiment_score,
-                        "⚠️ STRONG SELL: Trend is DOWN and News is BEARISH."
-                    )
+                            # 📝 LOG EVERYTHING
+                            trade_log.log_decision(
+                                symbol, price, sentiment_score,
+                                rsi, sma_50, action_status, reasoning
+                            )
+
+                # 3. CONFLUENCE: The Entry Logic
+                # Bullish: Trend is UP (Price > SMA), Not Overbought (RSI < 70), News is GOOD (> 0.4)
+                if sentiment_score and sentiment_score > 0.4:
+                    if price > sma_50 and rsi < 70:
+                        print(f"✅ {symbol}: STRONG BUY SIGNAL")
+                        notifier.send_alert(symbol, price, sentiment_score, "🔥 STRONG BUY (Trend + News)")
+                    else:
+                        print(f"⚖️ {symbol}: Bullish news, but math says WAIT (Price < SMA or RSI too high)")
+
+                # Bearish: Trend is DOWN (Price < SMA), News is BAD (< -0.4)
+                elif sentiment_score and sentiment_score < -0.4:
+                    if price < sma_50:
+                        print(f"⚠️ {symbol}: STRONG SELL SIGNAL")
+                        notifier.send_alert(symbol, price, sentiment_score, "📉 STRONG SELL (Trend + News)")
+
+                else:
+                    print(f"😴 {symbol}: No significant action (Score: {sentiment_score})")
 
             except Exception as e:
-                print(f"Error analyzing {symbol}: {e}")
+                print(f"❌ Error on {symbol}: {e}")
 
-        time.sleep(900) # Sleep for 15 mins to stay in free tier
+        # Cycle frequency: Every 1 hour to capture intraday swings without hitting rate limits
+        print("\nCycle complete. Next scan in 60 minutes...")
+        time.sleep(3600)
 
 if __name__ == "__main__":
-    run_assistant()
+    run_money_maker()
