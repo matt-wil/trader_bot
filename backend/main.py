@@ -28,6 +28,7 @@ def run_assistant():
     watch_list = [
         ("GLD", "stock"),      # Gold ETF
         ("BTC/USD", "crypto"), # Bitcoin
+        ("ETH/USD", "crypto"), # Ethereum
         ("NVDA", "stock")      # High-volatility Stock
     ]
 
