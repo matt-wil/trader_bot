@@ -18,3 +18,13 @@ class Notifier:
         )
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         requests.post(url, data={"chat_id": self.chat_id, "text": message, "parse_mode": "Markdown"})
+
+    def send_heartbeat(self):
+        """Sends a daily health check to your phone."""
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        msg = f"🟢 *AI Assistant Online*\nTime: `{now}`\nStatus: All systems operational."
+        self.send_custom_msg(msg)
+
+    def send_custom_msg(self, text):
+        url = f"https://api.telegram.org/bot{self.token}/sendMessage"
+        requests.post(url, data={"chat_id": self.chat_id, "text": text, "parse_mode": "Markdown"})
